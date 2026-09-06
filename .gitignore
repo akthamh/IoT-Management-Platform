@@ -22,3 +22,10 @@ venv/
 # OS files
 .DS_Store
 Thumbs.db
+
+
+# SQLite runtime database
+data/*.db
+data/*.db-journal
+data/*.db-shm
+data/*.db-wal

@@ -1,3 +1,4 @@
+from modules.database import initialize_database
 from modules.device_catalog import show_full_catalog
 from modules.device_manager import add_device, list_devices, search_device
 
@@ -20,6 +21,7 @@ def main() -> None:
 
     The menu keeps running until the user chooses option 0.
     """
+    initialize_database()
 
     while True:
         show_main_menu()
