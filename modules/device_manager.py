@@ -1,11 +1,12 @@
+import sqlite3
+from collections.abc import Mapping
+
 from modules.device_catalog import choose_device_type
-
-
-# Devices are stored in this list only while the program is running.
-#
-# In v0.2.0 this temporary list will be replaced by SQLite so the data remains
-# available after the program closes.
-devices: list[dict[str, str | int]] = []
+from modules.device_repository import (
+    create_device,
+    get_all_devices,
+    search_devices,
+)
 
 
 def ask_required_text(message: str) -> str:
@@ -51,11 +52,7 @@ def choose_status() -> str:
 
 
 def add_device() -> None:
-    """Register a new device manually.
-
-    The user selects the category and type from the device catalog instead of
-    typing the device type manually. This prevents inconsistent device names.
-    """
+    """Collect device information and save it in SQLite."""
 
     print("\n" + "=" * 40)
     print("             Add Device")
@@ -72,27 +69,17 @@ def add_device() -> None:
     print(f"\nSelected category: {category}")
     print(f"Selected type:     {device_type}")
 
-    name = ask_required_text("\nDevice name: ")
-    manufacturer = input("Manufacturer (optional): ").strip()
-    model = input("Model (optional): ").strip()
-    serial_number = ask_required_text("Serial number: ")
-    location = input("Location (optional): ").strip()
-    status = choose_status()
-
-    # ID is generated from the current list length.
-    # SQLite will generate persistent IDs in the next version.
-    device_id = len(devices) + 1
-
     device = {
-        "id": device_id,
-        "name": name,
+        "name": ask_required_text("\nDevice name: "),
         "category": category,
         "device_type": device_type,
-        "manufacturer": manufacturer,
-        "model": model,
-        "serial_number": serial_number,
-        "location": location,
-        "status": status,
+        "manufacturer": input("Manufacturer (optional): ").strip(),
+        "model": input("Model (optional): ").strip(),
+        # Normalizing the serial number prevents case differences
+        # such as temp-001 and TEMP-001.
+        "serial_number": ask_required_text("Serial number: ").upper(),
+        "location": input("Location (optional): ").strip(),
+        "status": choose_status(),
     }
 
     print("\nReview device")
@@ -101,17 +88,28 @@ def add_device() -> None:
 
     confirm = input("\nSave this device? (y/n): ").strip().lower()
 
-    if confirm == "y":
-        devices.append(device)
-        print("\nDevice added successfully.")
-    else:
+    if confirm != "y":
         print("\nDevice was not saved.")
+        return
+
+    try:
+        device_id = create_device(device)
+    except sqlite3.IntegrityError:
+        print("\nA device with this serial number already exists.")
+        return
+
+    print(f"\nDevice added successfully with ID {device_id}.")
 
 
-def print_device(device: dict[str, str | int]) -> None:
+def print_device(
+    device: Mapping[str, str | int | None],
+) -> None:
     """Print one device in a consistent readable format."""
 
-    print(f"ID:           {device['id']}")
+    # A new device has no ID until SQLite saves it.
+    device_id = device["id"] if "id" in device else "Generated when saved"
+
+    print(f"ID:           {device_id}")
     print(f"Name:         {device['name']}")
     print(f"Category:     {device['category']}")
     print(f"Type:         {device['device_type']}")
@@ -123,11 +121,13 @@ def print_device(device: dict[str, str | int]) -> None:
 
 
 def list_devices() -> None:
-    """Show all devices registered during the current program session."""
+    """Read and display all devices stored in SQLite."""
 
     print("\n" + "=" * 40)
     print("          Registered Devices")
     print("=" * 40)
+
+    devices = get_all_devices()
 
     if not devices:
         print("\nNo devices have been registered yet.")
@@ -140,28 +140,17 @@ def list_devices() -> None:
 
 
 def search_device() -> None:
-    """Search devices by name or serial number."""
-
-    if not devices:
-        print("\nNo devices have been registered yet.")
-        return
+    """Search SQLite for devices by name or serial number."""
 
     search_text = input(
         "\nEnter device name or serial number: "
-    ).strip().lower()
+    ).strip()
 
     if not search_text:
         print("Search text cannot be empty.")
         return
 
-    results = []
-
-    for device in devices:
-        name = str(device["name"]).lower()
-        serial = str(device["serial_number"]).lower()
-
-        if search_text in name or search_text in serial:
-            results.append(device)
+    results = search_devices(search_text)
 
     if not results:
         print("\nNo matching devices found.")

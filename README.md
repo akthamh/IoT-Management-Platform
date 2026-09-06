@@ -1,5 +1,22 @@
 # Multi-Tenant IoT Management Platform
 
+## Current development — v0.2.0 SQLite Database
+
+Development of v0.2.0 is in progress.
+
+Current progress:
+
+- [x] Create SQLite database connection
+- [x] Create the `devices` table
+- [x] Save devices permanently
+- [x] Read devices from SQLite
+- [x] Search devices in SQLite
+- [x] Reject duplicate serial numbers
+- [ ] Update devices
+- [ ] Delete devices
+
+The stable previous release is `v0.1.0`.
+
 ## v0.1.0 — Python CLI + Modules + Manual Device Registration
 
 This is the first educational version of the IoT Management Platform.
