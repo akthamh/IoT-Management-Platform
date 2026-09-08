@@ -1,5 +1,12 @@
+from modules.database import initialize_database
 from modules.device_catalog import show_full_catalog
-from modules.device_manager import add_device, list_devices, search_device
+from modules.device_manager import (
+    add_device,
+    delete_device,
+    list_devices,
+    search_device,
+    update_device,
+)
 
 
 def show_main_menu() -> None:
@@ -12,14 +19,15 @@ def show_main_menu() -> None:
     print("2. List devices")
     print("3. Search device")
     print("4. Show device catalog")
+    print("5. Update device")
+    print("6. Delete device")
     print("0. Exit")
 
 
 def main() -> None:
-    """Run the main program loop.
+    """Initialize the database and run the main program loop."""
 
-    The menu keeps running until the user chooses option 0.
-    """
+    initialize_database()
 
     while True:
         show_main_menu()
@@ -33,6 +41,10 @@ def main() -> None:
             search_device()
         elif choice == "4":
             show_full_catalog()
+        elif choice == "5":
+            update_device()
+        elif choice == "6":
+            delete_device()
         elif choice == "0":
             print("\nGoodbye!")
             break
