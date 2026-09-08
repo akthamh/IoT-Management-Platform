@@ -4,8 +4,11 @@ from collections.abc import Mapping
 from modules.device_catalog import choose_device_type
 from modules.device_repository import (
     create_device,
+    delete_device as delete_device_from_database,
     get_all_devices,
+    get_device_by_id,
     search_devices,
+    update_device as update_device_in_database,
 )
 
 
@@ -19,6 +22,21 @@ def ask_required_text(message: str) -> str:
             return value
 
         print("This field cannot be empty.")
+
+
+def ask_device_id(action: str) -> int | None:
+    """Ask for a positive device ID, or return None when cancelled."""
+
+    while True:
+        value = input(f"\nEnter the device ID to {action} (0 to cancel): ").strip()
+
+        if value == "0":
+            return None
+
+        if value.isdigit() and int(value) > 0:
+            return int(value)
+
+        print("Please enter a positive device ID or 0 to cancel.")
 
 
 def choose_status() -> str:
@@ -102,12 +120,15 @@ def add_device() -> None:
 
 
 def print_device(
-    device: Mapping[str, str | int | None],
+    device: Mapping[str, str | int | None] | sqlite3.Row,
 ) -> None:
     """Print one device in a consistent readable format."""
 
-    # A new device has no ID until SQLite saves it.
-    device_id = device["id"] if "id" in device else "Generated when saved"
+    # New unsaved dictionaries have no ID, while SQLite rows always do.
+    try:
+        device_id = device["id"]
+    except (KeyError, IndexError):
+        device_id = "Generated when saved"
 
     print(f"ID:           {device_id}")
     print(f"Name:         {device['name']}")
@@ -142,9 +163,7 @@ def list_devices() -> None:
 def search_device() -> None:
     """Search SQLite for devices by name or serial number."""
 
-    search_text = input(
-        "\nEnter device name or serial number: "
-    ).strip()
+    search_text = input("\nEnter device name or serial number: ").strip()
 
     if not search_text:
         print("Search text cannot be empty.")
@@ -162,3 +181,134 @@ def search_device() -> None:
         print()
         print_device(device)
         print("-" * 30)
+
+
+def update_device() -> None:
+    """Let the user update an existing device."""
+
+    print("\n" + "=" * 40)
+    print("            Update Device")
+    print("=" * 40)
+
+    device_id = ask_device_id("update")
+
+    if device_id is None:
+        print("\nUpdate cancelled.")
+        return
+
+    current_device = get_device_by_id(device_id)
+
+    if current_device is None:
+        print("\nDevice not found.")
+        return
+
+    print("\nCurrent device")
+    print("-" * 30)
+    print_device(current_device)
+
+    category = str(current_device["category"])
+    device_type = str(current_device["device_type"])
+
+    change_type = input("\nChange category and device type? (y/n): ").strip().lower()
+
+    if change_type == "y":
+        selection = choose_device_type()
+
+        if selection is not None:
+            category, device_type = selection
+
+    current_name = str(current_device["name"])
+    current_serial = str(current_device["serial_number"])
+
+    updated_device = {
+        "name": input(f"Name [{current_name}]: ").strip() or current_name,
+        "category": category,
+        "device_type": device_type,
+        "manufacturer": ask_optional_update(
+            "Manufacturer",
+            current_device["manufacturer"],
+        ),
+        "model": ask_optional_update("Model", current_device["model"]),
+        "serial_number": (
+            input(f"Serial number [{current_serial}]: ").strip() or current_serial
+        ).upper(),
+        "location": ask_optional_update("Location", current_device["location"]),
+        "status": str(current_device["status"]),
+    }
+
+    change_status = input("Change status? (y/n): ").strip().lower()
+
+    if change_status == "y":
+        updated_device["status"] = choose_status()
+
+    print("\nReview updated device")
+    print("-" * 30)
+    print_device({"id": device_id, **updated_device})
+
+    confirm = input("\nSave these changes? (y/n): ").strip().lower()
+
+    if confirm != "y":
+        print("\nChanges were not saved.")
+        return
+
+    try:
+        updated = update_device_in_database(device_id, updated_device)
+    except sqlite3.IntegrityError:
+        print("\nA device with this serial number already exists.")
+        return
+
+    if updated:
+        print("\nDevice updated successfully.")
+    else:
+        print("\nDevice not found.")
+
+
+def ask_optional_update(label: str, current_value: object) -> str:
+    """Keep, replace, or clear an optional text field."""
+
+    current_text = "" if current_value is None else str(current_value)
+    display_value = current_text or "-"
+    value = input(f"{label} [{display_value}] (Enter to keep, - to clear): ").strip()
+
+    if not value:
+        return current_text
+
+    if value == "-":
+        return ""
+
+    return value
+
+
+def delete_device() -> None:
+    """Delete a device only after explicit confirmation."""
+
+    print("\n" + "=" * 40)
+    print("            Delete Device")
+    print("=" * 40)
+
+    device_id = ask_device_id("delete")
+
+    if device_id is None:
+        print("\nDeletion cancelled.")
+        return
+
+    device = get_device_by_id(device_id)
+
+    if device is None:
+        print("\nDevice not found.")
+        return
+
+    print("\nDevice to delete")
+    print("-" * 30)
+    print_device(device)
+
+    confirm = input("\nType DELETE to confirm: ").strip()
+
+    if confirm != "DELETE":
+        print("\nDeletion cancelled.")
+        return
+
+    if delete_device_from_database(device_id):
+        print("\nDevice deleted successfully.")
+    else:
+        print("\nDevice not found.")
