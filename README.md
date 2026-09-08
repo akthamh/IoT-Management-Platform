@@ -1,6 +1,6 @@
 # Multi-Tenant IoT Management Platform
 
-## Current development — v0.2.0 SQLite Database
+## v0.2.0 — SQLite Device Persistence
 
 This educational release replaces temporary in-memory device storage with a persistent SQLite database while keeping the application intentionally simple and focused on Python.
 
@@ -38,8 +38,6 @@ No web frontend, React, FastAPI, Docker, or MQTT is used in this release.
 - [x] Update devices
 - [x] Delete devices
 - [x] Complete final manual testing
-- [ ] Merge the Pull Request
-- [ ] Create Git tag `v0.2.0`
 
 ## Project structure
 
