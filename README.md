@@ -1,5 +1,13 @@
 # Multi-Tenant IoT Management Platform
 
+### Tenant management
+
+- register tenants
+- list registered tenants
+- find a tenant by ID
+- search tenants by name or address
+- store tenant data permanently in SQLite
+
 ## v0.2.0 — SQLite Device Persistence
 
 This educational release replaces temporary in-memory device storage with a persistent SQLite database while keeping the application intentionally simple and focused on Python.
@@ -41,7 +49,7 @@ No web frontend, React, FastAPI, Docker, or MQTT is used in this release.
 
 ## Project structure
 
-```text
+```
 iot-management-platform/
 │
 ├── main.py
@@ -50,7 +58,9 @@ iot-management-platform/
 │   ├── database.py
 │   ├── device_catalog.py
 │   ├── device_manager.py
-│   └── device_repository.py
+│   ├── device_repository.py
+│   ├── tenant_manager.py
+│   └── tenant_repository.py
 │
 ├── data/
 │   └── iot_platform.db
@@ -132,6 +142,19 @@ Each device contains:
 - unique serial number
 - location
 - status
+
+### `modules/tenant_repository.py`
+
+- creates and reads tenant records in SQLite
+- searches tenants by name or address
+- keeps SQL separate from the CLI
+
+### `modules/tenant_manager.py`
+
+- collects and validates tenant input
+- displays tenant information
+- controls tenant-management workflows
+
 
 ## Previous release
 

@@ -8,6 +8,12 @@ from modules.device_manager import (
     update_device,
 )
 
+from modules.tenant_manager import (
+    add_tenant,
+    find_tenant,
+    list_tenants,
+    search_tenant,
+)
 
 def show_main_menu() -> None:
     """Display the main application menu."""
@@ -15,13 +21,22 @@ def show_main_menu() -> None:
     print("\n" + "=" * 40)
     print("       IoT Management Platform")
     print("=" * 40)
-    print("1. Add new device")
-    print("2. List devices")
-    print("3. Search device")
-    print("4. Show device catalog")
-    print("5. Update device")
-    print("6. Delete device")
-    print("0. Exit")
+
+    print("\nTenant Management")
+    print("1. Add tenant")
+    print("2. List tenants")
+    print("3. Find tenant by ID")
+    print("4. Search tenant")
+
+    print("\nDevice Management")
+    print("5. Add new device")
+    print("6. List devices")
+    print("7. Search device")
+    print("8. Show device catalog")
+    print("9. Update device")
+    print("10. Delete device")
+
+    print("\n0. Exit")
 
 
 def main() -> None:
@@ -34,16 +49,24 @@ def main() -> None:
         choice = input("\nChoose an option: ").strip()
 
         if choice == "1":
-            add_device()
+            add_tenant()
         elif choice == "2":
-            list_devices()
+            list_tenants()
         elif choice == "3":
-            search_device()
+            find_tenant()
         elif choice == "4":
-            show_full_catalog()
+            search_tenant()
         elif choice == "5":
-            update_device()
+            add_device()
         elif choice == "6":
+            list_devices()
+        elif choice == "7":
+            search_device()
+        elif choice == "8":
+            show_full_catalog()
+        elif choice == "9":
+            update_device()
+        elif choice == "10":
             delete_device()
         elif choice == "0":
             print("\nGoodbye!")
