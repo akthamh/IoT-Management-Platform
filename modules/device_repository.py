@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from modules.database import get_database_connection
 
 
-def create_device(device: Mapping[str, str]) -> int:
+def create_device(device: Mapping[str, str | int]) -> int:
     """Save one device in SQLite and return its generated ID."""
 
     connection = get_database_connection()
@@ -20,9 +20,10 @@ def create_device(device: Mapping[str, str]) -> int:
                 model,
                 serial_number,
                 location,
-                status
+                status,
+                tenant_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 device["name"],
@@ -33,6 +34,7 @@ def create_device(device: Mapping[str, str]) -> int:
                 device["serial_number"],
                 device["location"],
                 device["status"],
+                device["tenant_id"],
             ),
         )
 
@@ -51,17 +53,21 @@ def get_all_devices() -> list[sqlite3.Row]:
         cursor = connection.execute(
             """
             SELECT
-                id,
-                name,
-                category,
-                device_type,
-                manufacturer,
-                model,
-                serial_number,
-                location,
-                status
+                devices.id,
+                devices.name,
+                devices.category,
+                devices.device_type,
+                devices.manufacturer,
+                devices.model,
+                devices.serial_number,
+                devices.location,
+                devices.status,
+                devices.tenant_id,
+                tenants.name AS tenant_name
             FROM devices
-            ORDER BY id
+            JOIN tenants
+                ON devices.tenant_id = tenants.id
+            ORDER BY devices.id
             """
         )
 
@@ -79,17 +85,21 @@ def get_device_by_id(device_id: int) -> sqlite3.Row | None:
         cursor = connection.execute(
             """
             SELECT
-                id,
-                name,
-                category,
-                device_type,
-                manufacturer,
-                model,
-                serial_number,
-                location,
-                status
+                devices.id,
+                devices.name,
+                devices.category,
+                devices.device_type,
+                devices.manufacturer,
+                devices.model,
+                devices.serial_number,
+                devices.location,
+                devices.status,
+                devices.tenant_id,
+                tenants.name AS tenant_name
             FROM devices
-            WHERE id = ?
+            JOIN tenants
+                ON devices.tenant_id = tenants.id
+            WHERE devices.id = ?
             """,
             (device_id,),
         )
@@ -110,18 +120,22 @@ def search_devices(search_text: str) -> list[sqlite3.Row]:
         cursor = connection.execute(
             """
             SELECT
-                id,
-                name,
-                category,
-                device_type,
-                manufacturer,
-                model,
-                serial_number,
-                location,
-                status
+                devices.id,
+                devices.name,
+                devices.category,
+                devices.device_type,
+                devices.manufacturer,
+                devices.model,
+                devices.serial_number,
+                devices.location,
+                devices.status,
+                devices.tenant_id,
+                tenants.name AS tenant_name
             FROM devices
-            WHERE name LIKE ? OR serial_number LIKE ?
-            ORDER BY id
+            JOIN tenants
+                ON devices.tenant_id = tenants.id
+            WHERE devices.name LIKE ? OR devices.serial_number LIKE ?
+            ORDER BY devices.id
             """,
             (search_pattern, search_pattern),
         )
@@ -131,7 +145,7 @@ def search_devices(search_text: str) -> list[sqlite3.Row]:
         connection.close()
 
 
-def update_device(device_id: int, device: Mapping[str, str]) -> bool:
+def update_device(device_id: int, device: Mapping[str, str | int]) -> bool:
     """Update one device and return True when the device exists."""
 
     connection = get_database_connection()
@@ -148,7 +162,8 @@ def update_device(device_id: int, device: Mapping[str, str]) -> bool:
                 model = ?,
                 serial_number = ?,
                 location = ?,
-                status = ?
+                status = ?,
+                tenant_id = ?
             WHERE id = ?
             """,
             (
@@ -160,6 +175,7 @@ def update_device(device_id: int, device: Mapping[str, str]) -> bool:
                 device["serial_number"],
                 device["location"],
                 device["status"],
+                device["tenant_id"],
                 device_id,
             ),
         )

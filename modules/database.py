@@ -17,6 +17,7 @@ def get_database_connection() -> sqlite3.Connection:
     DATA_DIRECTORY.mkdir(exist_ok=True)
 
     connection = sqlite3.connect(DATABASE_PATH)
+    connection.execute("PRAGMA foreign_keys = ON")
 
     # Rows can later be accessed like dictionaries:
     # row["name"] instead of row[1].
@@ -31,6 +32,20 @@ def initialize_database() -> None:
     connection = get_database_connection()
 
     try:
+        # Create Tenants Table
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tenants (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                address TEXT,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+        # Create Device Table
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS devices (
@@ -42,11 +57,26 @@ def initialize_database() -> None:
                 model TEXT,
                 serial_number TEXT NOT NULL UNIQUE,
                 location TEXT,
-                status TEXT NOT NULL
+                status TEXT NOT NULL,
+                tenant_id INTEGER,
+                FOREIGN KEY (tenant_id) REFERENCES tenants(id)
             )
             """
         )
 
+        cursor = connection.execute("PRAGMA table_info(devices)")
+        tenant_id_exists = False
+        for column in cursor.fetchall():
+            if column["name"] == "tenant_id":
+                tenant_id_exists = True
+                break
+        if not tenant_id_exists:
+            connection.execute(
+                """
+                ALTER TABLE devices
+                ADD COLUMN tenant_id INTEGER REFERENCES tenants(id)
+                """
+            )
         connection.commit()
     finally:
         connection.close()
