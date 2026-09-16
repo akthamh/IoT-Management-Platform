@@ -1,5 +1,4 @@
 import sqlite3
-from collections.abc import Mapping
 
 from modules.tenant_repository import (
     create_tenant,
@@ -8,6 +7,7 @@ from modules.tenant_repository import (
     search_tenants,
 )
 
+from modules.models.tenant import Tenant
 
 def ask_required_text(message: str) -> str:
     """Ask for text and reject empty input."""
@@ -57,30 +57,30 @@ def add_tenant() -> None:
         print("\nTenant was not saved.")
         return
 
-    tenant_id = create_tenant(
+    tenant = create_tenant(
         name,
         address or None,
     )
 
-    print(f"\nTenant added successfully with ID {tenant_id}.")
+    print(f"\nTenant added successfully with ID {tenant.id}.")
 
 
 def print_tenant(
-    tenant: Mapping[str, object] | sqlite3.Row,
+    tenant: Tenant,
 ) -> None:
     """Print one tenant in a consistent readable format."""
 
-    print(f"ID:         {tenant['id']}")
-    print(f"Name:       {tenant['name']}")
-    print(f"Address:    {tenant['address'] or '-'}")
+    print(f"ID:         {tenant.id}")
+    print(f"Name:       {tenant.name}")
+    print(f"Address:    {tenant.address or '-'}")
 
-    if tenant["is_active"]:
+    if tenant.is_active:
         status = "Active"
     else:
         status = "Inactive"
 
     print(f"Status:     {status}")
-    print(f"Created at: {tenant['created_at']}")
+    print(f"Created at: {tenant.created_at}")
 
 
 def list_tenants() -> None:
