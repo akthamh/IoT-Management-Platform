@@ -1,5 +1,4 @@
 import sqlite3
-from collections.abc import Mapping
 
 from modules.device_catalog import choose_device_type
 from modules.device_repository import (
@@ -15,6 +14,8 @@ from modules.tenant_repository import (
     get_all_tenants,
     get_tenant_by_id,
 )
+
+from modules.models.device import Device
 
 def ask_required_text(message: str) -> str:
     """Ask for text and reject empty input."""
@@ -87,7 +88,7 @@ def choose_tenant() -> int | None:
     print("-" * 30)
 
     for tenant in tenants:
-        print(f"{tenant['id']}. {tenant['name']}")
+        print(f"{tenant.id}. {tenant.name}")
 
     while True:
         value = input("\nEnter tenant ID (0 to cancel): ").strip()
@@ -102,7 +103,7 @@ def choose_tenant() -> int | None:
         tenant_id = int(value)
 
         for tenant in tenants:
-            if tenant_id == tenant["id"]:
+            if tenant_id == tenant.id:
                 return tenant_id
 
         print("Invalid tenant ID.")
@@ -129,7 +130,7 @@ def add_device() -> None:
         print("\nTenant not found.")
         return
 
-    tenant_name = str(tenant["name"])
+    tenant_name = str(tenant.name)
 
     # Select a supported device type from the device catalog.
     selection = choose_device_type()
@@ -141,18 +142,18 @@ def add_device() -> None:
     category, device_type = selection
 
     # Collect device information.
-    device = {
-        "tenant_id": tenant_id,
-        "tenant_name": tenant_name,
-        "name": ask_required_text("\nDevice name: "),
-        "category": category,
-        "device_type": device_type,
-        "manufacturer": input("Manufacturer (optional): ").strip(),
-        "model": input("Model (optional): ").strip(),
-        "serial_number": ask_required_text("Serial number: ").upper(),
-        "location": input("Location (optional): ").strip(),
-        "status": choose_status(),
-    }
+    device = Device(
+        id=None,
+        name=ask_required_text("\nDevice name: "),
+        category=category,
+        device_type=device_type,
+        manufacturer=input("Manufacturer (optional): ").strip() or None,
+        model=input("Model (optional): ").strip() or None,
+        serial_number=ask_required_text("Serial number: ").upper(),
+        location=input("Location (optional): ").strip() or None,
+        status=choose_status(),
+        tenant_id=tenant_id,
+    )
 
     # Show all information before saving.
     print("\nReview device")
@@ -166,42 +167,47 @@ def add_device() -> None:
         return
 
     try:
-        device_id = create_device(device)
+        saved_device = create_device(device)
 
     except sqlite3.IntegrityError:
         print("\nA device with this serial number already exists.")
         return
 
-    print(f"\nDevice saved successfully with ID {device_id}.")
+    print(f"\nDevice saved successfully with ID {saved_device.id}.")
 
 
 def print_device(
-    device: Mapping[str, str | int | None] | sqlite3.Row,
+    device: Device | None,
 ) -> None:
     """Print one device in a consistent readable format."""
 
-    # New unsaved dictionaries have no ID, while SQLite rows always do.
-    try:
-        device_id = device["id"]
-    except (KeyError, IndexError):
-        device_id = "Generated when saved"
+    if device is None:
+        print("Device not found.")
+        return
 
-    try:
-        tenant_name = device["tenant_name"]
-    except (KeyError, IndexError):
+    # A new Device object may not have an ID until it is saved in SQLite.
+    if device.id is None:
+        device_id = "Generated when saved"
+    else:
+        device_id = device.id
+
+    tenant = get_tenant_by_id(device.tenant_id)
+    if tenant is not None:
+        tenant_name = tenant.name
+    else:
         tenant_name = None
 
     print(f"ID:           {device_id}")
     if tenant_name:
         print(f"Tenant:       {tenant_name}")
-    print(f"Name:         {device['name']}")
-    print(f"Category:     {device['category']}")
-    print(f"Type:         {device['device_type']}")
-    print(f"Manufacturer: {device['manufacturer'] or '-'}")
-    print(f"Model:        {device['model'] or '-'}")
-    print(f"Serial:       {device['serial_number']}")
-    print(f"Location:     {device['location'] or '-'}")
-    print(f"Status:       {device['status']}")
+    print(f"Name:         {device.name}")
+    print(f"Category:     {device.category}")
+    print(f"Type:         {device.device_type}")
+    print(f"Manufacturer: {device.manufacturer or '-'}")
+    print(f"Model:        {device.model or '-'}")
+    print(f"Serial:       {device.serial_number}")
+    print(f"Location:     {device.location or '-'}")
+    print(f"Status:       {device.status}")
 
 
 def list_devices() -> None:
@@ -275,8 +281,13 @@ def update_device() -> None:
     # Tenant
     # -------------------------------------------------
 
-    tenant_id = int(current_device["tenant_id"])
-    tenant_name = str(current_device["tenant_name"])
+    tenant_id = int(current_device.tenant_id)
+    tenant = get_tenant_by_id(current_device.tenant_id)
+
+    if tenant is not None:
+        tenant_name = tenant.name
+    else:
+        tenant_name = None
 
     change_tenant = input(
         f"\nChange tenant [{tenant_name}]? (y/n): "
@@ -290,14 +301,14 @@ def update_device() -> None:
 
             if tenant is not None:
                 tenant_id = new_tenant_id
-                tenant_name = str(tenant["name"])
+                tenant_name = str(tenant.name)
 
     # -------------------------------------------------
     # Device type
     # -------------------------------------------------
 
-    category = str(current_device["category"])
-    device_type = str(current_device["device_type"])
+    category = str(current_device.category)
+    device_type = str(current_device.device_type)
 
     change_type = input(
         f"\nChange device type [{category} / {device_type}]? (y/n): "
@@ -313,64 +324,51 @@ def update_device() -> None:
     # Status
     # -------------------------------------------------
 
-    current_status = str(current_device["status"])
-    status = current_status
+    status = current_device.status
 
     change_status = input(
-        f"\nChange status [{current_status}]? (y/n): "
+        f"\nChange status [{current_device.status}]? (y/n): "
     ).strip().lower()
 
     if change_status == "y":
         status = choose_status()
 
     # -------------------------------------------------
-    # Current required values
-    # -------------------------------------------------
-
-    current_name = str(current_device["name"])
-    current_serial = str(current_device["serial_number"])
-
-    # -------------------------------------------------
     # Build updated device
     # -------------------------------------------------
 
-    updated_device = {
-        "tenant_id": tenant_id,
+    updated_device = Device(
+        id=device_id,
+        tenant_id=tenant_id,
+        name=input(
+            f"Name [{current_device.name}]: ").strip()
+            or current_device.name,
 
-        # Used only for display during review.
-        "tenant_name": tenant_name,
+        category=category,
+        device_type=device_type,
 
-        "name": input(
-            f"Name [{current_name}]: "
-        ).strip() or current_name,
-
-        "category": category,
-        "device_type": device_type,
-
-        "manufacturer": ask_optional_update(
+        manufacturer=ask_optional_update(
             "Manufacturer",
-            current_device["manufacturer"],
+            current_device.manufacturer,
         ),
 
-        "model": ask_optional_update(
+        model=ask_optional_update(
             "Model",
-            current_device["model"],
+            current_device.model,
         ),
 
-        "serial_number": (
-            input(
-                f"Serial number [{current_serial}]: "
-            ).strip().upper()
-            or current_serial
+        serial_number=(
+            input(f"Serial number [{current_device.serial_number}]: ").strip().upper()
+            or current_device.serial_number
         ),
 
-        "location": ask_optional_update(
+        location=ask_optional_update(
             "Location",
-            current_device["location"],
+            current_device.location,
         ),
 
-        "status": status,
-    }
+        status=status,
+    )
 
     # -------------------------------------------------
     # Review before saving
@@ -379,12 +377,7 @@ def update_device() -> None:
     print("\nReview updated device")
     print("-" * 30)
 
-    print_device(
-        {
-            "id": device_id,
-            **updated_device,
-        }
-    )
+    print_device(updated_device)
 
     confirm = input(
         "\nSave these changes? (y/n): "
@@ -399,10 +392,7 @@ def update_device() -> None:
     # -------------------------------------------------
 
     try:
-        updated = update_device_in_database(
-            device_id,
-            updated_device,
-        )
+        updated = update_device_in_database(updated_device)
 
     except sqlite3.IntegrityError:
         print(
